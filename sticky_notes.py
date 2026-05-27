@@ -108,6 +108,19 @@ CRASH_LOG_FILE = _resolve_crash_log_file()
 EMBEDDED_IMG_PREFIX = "[[IMG:"
 EMBEDDED_TABLE_PREFIX = "[[TABLE:"
 EMBEDDED_MARKER_SUFFIX = "]]"
+DEBUG_LOG_FILE = DATA_FILE.parent / "debug_session.log"
+DEBUG_LOG_ENABLED = os.getenv("STICKY_DEBUG", "1") != "0"
+
+
+def _debug_log(message: str) -> None:
+    if not DEBUG_LOG_ENABLED:
+        return
+    try:
+        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}\n"
+        with DEBUG_LOG_FILE.open("a", encoding="utf-8") as f:
+            f.write(line)
+    except OSError:
+        return
 
 
 def _resolve_media_dir() -> Path:
@@ -1217,6 +1230,7 @@ class NoteWindow(tk.Toplevel):
         self._resize_drag_start = None
         self._preferred_hkl = None
         self._prefer_korean_layout = False
+        self._last_embedded_widget_count = 0
 
         self.title(note["title"])
         self.geometry(f"{note['width']}x{note['height']}+{note['x']}+{note['y']}")
@@ -1234,6 +1248,7 @@ class NoteWindow(tk.Toplevel):
         self.bind("<F2>", self._prompt_rename_note)
         self.after(150, self._apply_collapsed_state)
         self.after(220, self._ensure_visible_geometry)
+        _debug_log(f"note_window_open note_id={self.note_id} title={self.title()}")
 
     def _ensure_visible_geometry(self) -> None:
         if not self.winfo_exists() or self._is_collapsed:
@@ -1424,6 +1439,14 @@ class NoteWindow(tk.Toplevel):
     def _on_text_change(self, _event=None) -> None:
         if self._suspend_text_change:
             return
+
+        alive_count = len([w for w in self._embedded_widgets if w.winfo_exists()])
+        if alive_count < self._last_embedded_widget_count:
+            _debug_log(
+                f"embedded_widget_count_drop note_id={self.note_id} prev={self._last_embedded_widget_count} now={alive_count}"
+            )
+        self._last_embedded_widget_count = alive_count
+
         content = self.text.get("1.0", "end-1c")
         # Avoid refreshing the manager list on every keystroke to keep IME typing smooth.
         self.app.update_note(self.note_id, content=content, refresh_list=False)
@@ -1597,6 +1620,8 @@ class NoteWindow(tk.Toplevel):
         self._embedded_marker_seq += 1
         self.text.mark_set(marker_name, marker_index)
         self.text.mark_gravity(marker_name, tk.LEFT)
+        marker_type = "table" if marker.startswith(EMBEDDED_TABLE_PREFIX) else "image"
+        _debug_log(f"marker_insert note_id={self.note_id} marker={marker_name} type={marker_type} index={marker_index}")
         return marker_name
 
     def _clear_embedded_objects(self) -> None:
@@ -1621,6 +1646,7 @@ class NoteWindow(tk.Toplevel):
 
     def _render_note_content(self, content: str) -> None:
         self._suspend_text_change = True
+        _debug_log(f"render_start note_id={self.note_id} chars={len(content)}")
         try:
             self.text.delete("1.0", "end")
             self._clear_embedded_objects()
@@ -1654,6 +1680,9 @@ class NoteWindow(tk.Toplevel):
                 idx += 1
         finally:
             self._suspend_text_change = False
+            alive_count = len([w for w in self._embedded_widgets if w.winfo_exists()])
+            self._last_embedded_widget_count = alive_count
+            _debug_log(f"render_end note_id={self.note_id} embedded_widgets={alive_count}")
 
     def _render_markdown_image_line(self, line: str) -> bool:
         stripped = line.strip()
@@ -1827,10 +1856,20 @@ class NoteWindow(tk.Toplevel):
             normalized_merges = self._normalize_merged_ranges(merged_ranges or [], len(data_rows), col_count)
 
             frame = tk.Frame(self.text, bg="#d8ccb8", bd=1, relief="solid")
+            frame._table_id = uuid.uuid4().hex[:8]
             frame._table_rows = data_rows
             frame._table_merges = normalized_merges
             frame._table_entries = {}
             frame._table_vars = {}
+
+            # Disable double-click gestures on embedded tables to avoid
+            # accidental event paths that can destabilize widget state.
+            frame.bind("<Double-Button-1>", lambda _event: "break", add="+")
+            frame.bind("<Triple-Button-1>", lambda _event: "break", add="+")
+
+            _debug_log(
+                f"table_create note_id={self.note_id} table_id={frame._table_id} marker={marker_name} rows={len(data_rows)} cols={col_count} merges={len(normalized_merges)}"
+            )
 
             def merge_at_top_left(rr: int, cc: int):
                 for merge in frame._table_merges:
@@ -1868,6 +1907,8 @@ class NoteWindow(tk.Toplevel):
                     entry.grid(row=r, column=c, rowspan=rowspan, columnspan=colspan, sticky="nsew", padx=1, pady=1, ipadx=3, ipady=2)
                     frame._table_entries[(r, c)] = entry
                     frame._table_vars[(r, c)] = cell_var
+                    entry.bind("<Double-Button-1>", lambda _event: "break", add="+")
+                    entry.bind("<Triple-Button-1>", lambda _event: "break", add="+")
                     cell_var.trace_add(
                         "write",
                         lambda *_args, mark=marker_name, table_frame=frame, rr=r, cc=c, var=cell_var: self._on_embedded_table_var_change(mark, table_frame, rr, cc, var),
@@ -1888,8 +1929,16 @@ class NoteWindow(tk.Toplevel):
 
             self.text.window_create(index, window=frame, padx=2, pady=2)
             self._embedded_widgets.append(frame)
+            frame.bind(
+                "<Destroy>",
+                lambda _event, table_id=frame._table_id, mark=marker_name: _debug_log(
+                    f"table_destroy note_id={self.note_id} table_id={table_id} marker={mark}"
+                ),
+                add="+",
+            )
             return True
         except Exception:
+            _debug_log(f"table_create_error note_id={self.note_id} marker={marker_name}")
             return False
 
     def _on_embedded_table_entry_change(self, marker_name: str, frame: tk.Frame, row: int, col: int) -> None:
@@ -1924,6 +1973,7 @@ class NoteWindow(tk.Toplevel):
     def _sync_embedded_table_marker(self, marker_name: str, frame: tk.Frame | list[list[tk.Entry]]) -> None:
         self._table_sync_jobs[marker_name] = None
         if marker_name not in self.text.mark_names():
+            _debug_log(f"table_sync_skip_missing_marker note_id={self.note_id} marker={marker_name}")
             return
 
         rows: list[list[str]] = []
@@ -1946,6 +1996,11 @@ class NoteWindow(tk.Toplevel):
         ).decode("ascii")
         marker = f"{EMBEDDED_TABLE_PREFIX}{payload}{EMBEDDED_MARKER_SUFFIX}"
 
+        alive_count_before = len([w for w in self._embedded_widgets if w.winfo_exists()])
+        _debug_log(
+            f"table_sync_start note_id={self.note_id} marker={marker_name} rows={len(rows)} cols={(len(rows[0]) if rows else 0)} alive_before={alive_count_before}"
+        )
+
         marker_index = self.text.index(marker_name)
         line_end = self.text.index(f"{marker_index} lineend")
 
@@ -1959,6 +2014,11 @@ class NoteWindow(tk.Toplevel):
             self.text.mark_gravity(marker_name, tk.LEFT)
         finally:
             self._suspend_text_change = False
+
+        alive_count_after = len([w for w in self._embedded_widgets if w.winfo_exists()])
+        _debug_log(
+            f"table_sync_end note_id={self.note_id} marker={marker_name} alive_after={alive_count_after}"
+        )
 
         self._on_text_change()
 
