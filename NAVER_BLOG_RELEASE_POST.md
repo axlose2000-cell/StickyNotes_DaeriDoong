@@ -9,6 +9,36 @@ Windows에서 가볍게 사용할 수 있는 데스크톱 스티커 노트 앱 S
 - 파일명: StickyNotes_DaeriDoong.exe
 - 최신 핫픽스(v1.0.2) 기준 파일을 사용해 주세요.
 
+## 다운로드 방법(처음 사용자용)
+
+1. GitHub Releases 페이지를 엽니다.
+2. 최신 버전(v1.0.2) 항목을 선택합니다.
+3. Assets에서 StickyNotes_DaeriDoong.exe를 클릭해 다운로드합니다.
+4. 다운로드 폴더(예: Downloads)에 파일이 저장되었는지 확인합니다.
+
+## 설치/실행 방법
+
+이 앱은 설치 마법사가 없는 단일 실행 파일 방식입니다.
+
+1. 다운로드한 StickyNotes_DaeriDoong.exe를 원하는 폴더(예: C:\Apps\StickyNotes_DaeriDoong)로 이동합니다.
+2. exe를 실행합니다.
+3. 바탕화면 바로가기가 필요하면 프로젝트의 create_shortcut.bat를 실행합니다.
+4. SmartScreen 경고가 나오면 배포 페이지의 해시값 검증 후 실행 여부를 판단해 주세요.
+
+## 디지털 지문(파일 해시) 확인 방법
+
+배포 파일이 위변조되지 않았는지 SHA-256으로 확인할 수 있습니다.
+
+1. PowerShell 실행
+2. 아래 명령 실행
+Get-FileHash "C:\경로\StickyNotes_DaeriDoong.exe" -Algorithm SHA256
+3. 출력된 Hash 값이 아래 공식 해시와 완전히 동일한지 확인
+
+공식 SHA-256
+BB89A798E1AC1306E8B220FB1477812CC61D44729C30E2467B546FE4C42CF8AB
+
+값이 다르면 파일이 손상되었거나 다른 파일일 수 있으므로 실행하지 말고 다시 다운로드해 주세요.
+
 ## 주요 기능
 
 - 다중 노트 창 관리
