@@ -7,6 +7,7 @@ Windows에서 가볍게 사용할 수 있는 데스크톱 스티커 노트 앱 S
 
 - 공식 GitHub Releases 페이지에서 다운로드
 - 파일명: StickyNotes_DaeriDoong.exe
+- 최신 핫픽스(v1.0.1) 기준 파일을 사용해 주세요.
 
 ## 주요 기능
 
@@ -59,7 +60,7 @@ Windows에서 가볍게 사용할 수 있는 데스크톱 스티커 노트 앱 S
 ## 무결성 검증 정보
 
 - SHA-256
-3377344CA11D59577B5F1DB2648C167FF600D2D7C8FF1E3E777D06D197F2706D
+FD96407874F87B88FB4976457DA6FA529E525F1648AE7A934E4A9C3D11B1BBA6
 
 - Windows PowerShell 해시 확인 명령
 Get-FileHash "C:\경로\StickyNotes_DaeriDoong.exe" -Algorithm SHA256
