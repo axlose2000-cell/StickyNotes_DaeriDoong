@@ -109,7 +109,7 @@ EMBEDDED_IMG_PREFIX = "[[IMG:"
 EMBEDDED_TABLE_PREFIX = "[[TABLE:"
 EMBEDDED_MARKER_SUFFIX = "]]"
 DEBUG_LOG_FILE = DATA_FILE.parent / "debug_session.log"
-DEBUG_LOG_ENABLED = os.getenv("STICKY_DEBUG", "1") != "0"
+DEBUG_LOG_ENABLED = os.getenv("STICKY_DEBUG", "0") != "0"
 
 
 def _debug_log(message: str) -> None:
