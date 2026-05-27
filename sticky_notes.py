@@ -1956,8 +1956,10 @@ class NoteWindow(tk.Toplevel):
 
         self._suspend_text_change = True
         try:
-            self.text.delete(marker_index, f"{line_end}+1c")
-            self.text.insert(marker_index, marker + "\n", ("embedded_marker",))
+            # Replace only marker text. Deleting the trailing newline can also
+            # consume adjacent embedded windows in the next visual line.
+            self.text.delete(marker_index, line_end)
+            self.text.insert(marker_index, marker, ("embedded_marker",))
             self.text.mark_set(marker_name, marker_index)
             self.text.mark_gravity(marker_name, tk.LEFT)
         finally:
